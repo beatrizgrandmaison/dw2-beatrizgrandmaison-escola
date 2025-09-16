@@ -1,0 +1,58 @@
+### Listar alunos
+GET http://localhost:8000/alunos
+
+### Criar turma
+POST http://localhost:8000/turmas
+Content-Type: application/json
+
+{
+  "nome": "Turma X",
+  "capacidade": 15
+}
+
+### Criar aluno
+POST http://localhost:8000/alunos
+Content-Type: application/json
+
+{
+  "nome": "Teste Aluno",
+  "data_nascimento": "2014-05-01",
+  "email": "teste.aluno@example.com",
+  "status": "inativo"
+}
+
+### Matricular
+POST http://localhost:8000/matriculas
+Content-Type: application/json
+
+{
+  "aluno_id": 1,
+  "turma_id": 1
+}
+
+### Export CSV
+GET http://localhost:8000/export/alunos?format=csv
+
+### Export JSON
+GET http://localhost:8000/export/alunos?format=json
+
+### Export Matriculas CSV
+GET http://localhost:8000/export/matriculas?format=csv
+
+### Export Matriculas JSON
+GET http://localhost:8000/export/matriculas?format=json
+
+### Atualizar aluno
+PUT http://localhost:8000/alunos/1
+Content-Type: application/json
+
+{
+  "nome": "Teste Aluno Editado",
+  "data_nascimento": "2012-06-01",
+  "email": "teste.aluno@example.com",
+  "status": "ativo",
+  "turma_id": 1
+}
+
+### Deletar aluno
+DELETE http://localhost:8000/alunos/1
