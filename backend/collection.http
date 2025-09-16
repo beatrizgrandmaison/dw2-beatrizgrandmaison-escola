@@ -56,3 +56,33 @@ Content-Type: application/json
 
 ### Deletar aluno
 DELETE http://localhost:8000/alunos/1
+
+### Login (obter token)
+POST http://localhost:8000/login
+Content-Type: application/x-www-form-urlencoded
+
+username=admin&password=adminpass
+
+### Criar turma (protegido) - incluir header Authorization: Bearer <token>
+POST http://localhost:8000/turmas
+Content-Type: application/json
+Authorization: Bearer <token>
+
+{
+  "nome": "Turma Protected",
+  "capacidade": 12
+}
+
+### Atualizar turma (protegido)
+PUT http://localhost:8000/turmas/1
+Content-Type: application/json
+Authorization: Bearer <token>
+
+{
+  "nome": "Turma Atualizada",
+  "capacidade": 20
+}
+
+### Deletar turma (protegido)
+DELETE http://localhost:8000/turmas/1
+Authorization: Bearer <token>

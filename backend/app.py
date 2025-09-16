@@ -6,6 +6,10 @@ from typing import Optional, List
 from datetime import date, datetime, timedelta
 from sqlalchemy import create_engine, Column, Integer, String, Date, ForeignKey
 from sqlalchemy.orm import sessionmaker, declarative_base, relationship
+from fastapi import Depends, status
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 
 DATABASE_URL = "sqlite:///./school.db"
 
@@ -59,6 +63,72 @@ class TurmaIn(BaseModel):
     nome: str
     capacidade: int
 
+
+# --- Autenticação simples (JWT)
+SECRET_KEY = "dev-secret-key-change-me"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
+
+def verify_password(plain, hashed):
+    return pwd_context.verify(plain, hashed)
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
+
+# usuário administrador hardcoded para demo
+FAKE_USERS_DB = {
+    "admin": {"username": "admin", "full_name": "Admin", "hashed_password": get_password_hash("adminpass"), "disabled": False}
+}
+
+def authenticate_user(username: str, password: str):
+    user = FAKE_USERS_DB.get(username)
+    if not user:
+        return False
+    if not verify_password(password, user["hashed_password"]):
+        return False
+    return user
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate credentials", headers={"WWW-Authenticate": "Bearer"})
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    user = FAKE_USERS_DB.get(username)
+    if user is None:
+        raise credentials_exception
+    return user
+
+def require_admin(user=Depends(get_current_user)):
+    # placeholder — in real system checar permissões
+    return user
+
+# Middleware de tratamento global de erros
+@app.middleware("http")
+async def global_error_handler(request, call_next):
+    try:
+        return await call_next(request)
+    except HTTPException as e:
+        return JSONResponse(status_code=e.status_code, content={"detail": e.detail})
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"detail": str(e)})
+
+
 class MatriculaIn(BaseModel):
     aluno_id: int
     turma_id: int
@@ -67,8 +137,17 @@ class MatriculaIn(BaseModel):
 def health():
     return {"status": "ok"}
 
-@app.get("/alunos")
-def list_alunos(search: Optional[str] = None, turma_id: Optional[int] = None, status: Optional[str] = None):
+
+@app.post("/login", tags=["auth"], summary="Login de administrador")
+def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = authenticate_user(form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(status_code=400, detail="Usuário ou senha inválidos")
+    access_token = create_access_token(data={"sub": user["username"]})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@app.get("/alunos", tags=["alunos"], summary="Listar alunos com filtros")
+def list_alunos(search: Optional[str] = None, turma_id: Optional[int] = None, status: Optional[str] = None, page: int = 1, per_page: int = 50):
     db = SessionLocal()
     q = db.query(Aluno)
     if search:
@@ -77,7 +156,8 @@ def list_alunos(search: Optional[str] = None, turma_id: Optional[int] = None, st
         q = q.filter(Aluno.turma_id == turma_id)
     if status:
         q = q.filter(Aluno.status == status)
-    results = q.all()
+    total = q.count()
+    results = q.offset((page-1)*per_page).limit(per_page).all()
     # serializar manualmente para evitar problemas com tipos
     out = []
     for a in results:
@@ -90,7 +170,7 @@ def list_alunos(search: Optional[str] = None, turma_id: Optional[int] = None, st
             "turma_id": a.turma_id,
             "turma": a.turma.nome if a.turma else None,
         })
-    return out
+    return {"total": total, "page": page, "per_page": per_page, "results": out}
 
 @app.post("/alunos")
 def create_aluno(payload: AlunoIn):
@@ -166,7 +246,7 @@ def list_turmas():
     return db.query(Turma).all()
 
 @app.post("/turmas")
-def create_turma(payload: TurmaIn):
+def create_turma(payload: TurmaIn, user=Depends(require_admin)):
     db = SessionLocal()
     # validações custom
     if payload.capacidade < 1:
@@ -176,6 +256,35 @@ def create_turma(payload: TurmaIn):
     db.commit()
     db.refresh(turma)
     return turma
+
+
+@app.put("/turmas/{id}", tags=["turmas"], summary="Atualizar turma")
+def update_turma(id: int, payload: TurmaIn, user=Depends(require_admin)):
+    db = SessionLocal()
+    turma = db.query(Turma).get(id)
+    if not turma:
+        raise HTTPException(status_code=404, detail="Turma não encontrada")
+    if payload.capacidade < 1:
+        raise HTTPException(status_code=400, detail="Capacidade da turma deve ser ao menos 1")
+    turma.nome = payload.nome
+    turma.capacidade = payload.capacidade
+    db.commit()
+    db.refresh(turma)
+    return turma
+
+
+@app.delete("/turmas/{id}", tags=["turmas"], summary="Deletar turma")
+def delete_turma(id: int, user=Depends(require_admin)):
+    db = SessionLocal()
+    turma = db.query(Turma).get(id)
+    if not turma:
+        raise HTTPException(status_code=404, detail="Turma não encontrada")
+    ocupacao = db.query(Aluno).filter(Aluno.turma_id == turma.id).count()
+    if ocupacao > 0:
+        raise HTTPException(status_code=400, detail="Não é possível excluir turma com alunos matriculados")
+    db.delete(turma)
+    db.commit()
+    return {"detail": "Turma deletada"}
 
 
 @app.get("/export/alunos")
