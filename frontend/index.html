@@ -12,6 +12,16 @@
     <div class="search">
       <input id="search" placeholder="Buscar aluno..." aria-label="Buscar aluno" />
       <button id="btnNovo">Novo Aluno</button>
+      <div class="turma-controls">
+        <button id="btnNovaTurma">Nova Turma</button>
+        <button id="btnGerenciarTurmas">Gerenciar Turmas</button>
+      </div>
+      <div class="export-controls">
+        <button id="btnExportAlunosCsv">Exportar Alunos CSV</button>
+        <button id="btnExportAlunosJson">Exportar Alunos JSON</button>
+        <button id="btnExportMatriculasCsv">Exportar Matrículas CSV</button>
+        <button id="btnExportMatriculasJson">Exportar Matrículas JSON</button>
+      </div>
     </div>
   </header>
   <main class="container">
@@ -29,10 +39,15 @@
       <table id="alunosTable">
         <caption>Lista de Alunos</caption>
         <thead>
-          <tr><th data-sort="nome">Nome</th><th data-sort="idade">Idade</th><th>Turma</th><th>Status</th><th>Ações</th></tr>
+          <tr><th data-sort="nome">Nome</th><th data-sort="idade">Idade</th><th data-sort="turma">Turma</th><th data-sort="status">Status</th><th>Ações</th></tr>
         </thead>
         <tbody></tbody>
       </table>
+      <div class="pagination">
+        <button id="prevPage">Anterior</button>
+        <span id="pageInfo">Página 1</span>
+        <button id="nextPage">Próxima</button>
+      </div>
     </section>
   </main>
 
@@ -55,6 +70,32 @@
       </div>
     </form>
   </div>
+
+  <!-- Turma modal -->
+  <div id="turmaModal" class="modal" hidden aria-hidden="true">
+    <form id="formTurma" class="modal-content" aria-modal="true" role="dialog">
+      <h2 id="turmaModalTitle">Nova Turma</h2>
+      <input type="hidden" name="id" />
+      <label>Nome <input name="nome" required /></label>
+      <label>Capacidade <input name="capacidade" type="number" min="1" value="10" required /></label>
+      <div class="modal-actions">
+        <button type="submit">Salvar</button>
+        <button type="button" id="btnCloseTurma">Fechar</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Gerenciar turmas -->
+  <div id="manageTurmas" class="panel" hidden>
+    <h2>Gerenciar Turmas</h2>
+    <table id="turmasTable">
+      <thead><tr><th>Nome</th><th>Capacidade</th><th>Ações</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- Toasts -->
+  <div id="toastContainer" aria-live="polite" aria-atomic="true"></div>
 
   <script src="app.js"></script>
 </body>
