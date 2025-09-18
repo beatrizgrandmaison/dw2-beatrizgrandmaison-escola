@@ -243,7 +243,8 @@ def delete_aluno(id: int):
 @app.get("/turmas")
 def list_turmas():
     db = SessionLocal()
-    return db.query(Turma).all()
+    turmas = db.query(Turma).all()
+    return [{"id": t.id, "nome": t.nome, "capacidade": t.capacidade} for t in turmas]
 
 @app.post("/turmas")
 def create_turma(payload: TurmaIn, user=Depends(require_admin)):
@@ -255,7 +256,7 @@ def create_turma(payload: TurmaIn, user=Depends(require_admin)):
     db.add(turma)
     db.commit()
     db.refresh(turma)
-    return turma
+    return {"id": turma.id, "nome": turma.nome, "capacidade": turma.capacidade}
 
 
 @app.put("/turmas/{id}", tags=["turmas"], summary="Atualizar turma")
@@ -270,7 +271,7 @@ def update_turma(id: int, payload: TurmaIn, user=Depends(require_admin)):
     turma.capacidade = payload.capacidade
     db.commit()
     db.refresh(turma)
-    return turma
+    return {"id": turma.id, "nome": turma.nome, "capacidade": turma.capacidade}
 
 
 @app.delete("/turmas/{id}", tags=["turmas"], summary="Deletar turma")
@@ -382,4 +383,4 @@ def matricular(payload: MatriculaIn):
     aluno.status = "ativo"
     db.commit()
     db.refresh(aluno)
-    return {"detail": "Matriculado", "aluno": aluno}
+    return {"detail": "Matriculado", "aluno": {"id": aluno.id, "nome": aluno.nome, "data_nascimento": aluno.data_nascimento.isoformat() if aluno.data_nascimento else None, "email": aluno.email, "status": aluno.status, "turma_id": aluno.turma_id, "turma": aluno.turma.nome if aluno.turma else None}}
